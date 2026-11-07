@@ -129,7 +129,9 @@ input:focus,select:focus{border-color:var(--accent);outline:none}
 .seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:2px;align-self:flex-start}
 .seg button{border:0;background:none;border-radius:999px;padding:5px 12px;font-size:.82rem;color:var(--muted)}
 .seg{flex-wrap:wrap}
-#spreadSeg{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));width:100%;border-radius:10px}
+#payMode{display:grid;grid-template-columns:1fr 1fr;width:100%;border-radius:10px}
+#payMode button{padding:8px 4px;border-radius:8px}
+#spreadSeg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;border-radius:10px}
 #spreadSeg button{padding:7px 2px;border-radius:8px;font-size:.8rem;white-space:nowrap}
 .spreadtag{display:inline-block;font-size:.72rem;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:4px;padding:0 5px;margin-left:4px;vertical-align:1px}
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 0 0 1px var(--line)}
@@ -215,16 +217,6 @@ input:focus,select:focus{border-color:var(--accent);outline:none}
           <div class="field amount"><label class="label" for="fAmount">Betrag €</label><input id="fAmount" inputmode="decimal" enterkeyhint="next" placeholder="0,00"></div>
           <div class="field"><label class="label" for="fDate">Datum</label><input id="fDate" type="date"></div>
         </div>
-        <div class="field"><span class="label">Zeitraum</span>
-          <div class="seg" role="group" aria-label="Zeitraum" id="spreadSeg">
-            <button type="button" data-n="1" aria-pressed="true">Einmalig</button>
-            <button type="button" data-n="3" aria-pressed="false">3 Mon.</button>
-            <button type="button" data-n="6" aria-pressed="false">6 Mon.</button>
-            <button type="button" data-n="12" aria-pressed="false">12 Mon.</button>
-            <button type="button" data-n="24" aria-pressed="false">24 Mon.</button>
-          </div>
-          <p class="note" id="spreadHint">Für Jahreskäufe wie BahnCard oder Büchereiausweis: Der Betrag wird gleichmäßig auf die Monate verteilt.</p>
-        </div>
         <div class="field"><label class="label" for="fNote">Wofür? (optional)</label><input id="fNote" enterkeyhint="done" placeholder="z. B. Rewe Wocheneinkauf"></div>
         <div class="field"><span class="label">Kategorie</span><div class="chips" id="catChips"></div></div>
         <button class="primary" type="submit">Eintragen</button>
@@ -276,15 +268,32 @@ input:focus,select:focus{border-color:var(--accent);outline:none}
   <!-- FIXKOSTEN -->
   <div id="viewFix" class="wrap" style="max-width:none" hidden>
     <section class="panel" aria-label="Fixkosten hinzufügen">
-      <h2>Monatliche Fixkosten</h2>
-      <p class="note">Alles, was jeden Monat automatisch abgeht: Miete, Handy, Deutschlandticket, Abos, Versicherungen. Diese Posten zählen in jedem Monat mit.</p>
+      <h2>Fixkosten hinzufügen</h2>
       <form class="add" id="fixForm" autocomplete="off">
+        <div class="field"><span class="label">Zahlweise</span>
+          <div class="seg" role="group" aria-label="Zahlweise" id="payMode">
+            <button type="button" data-mode="monthly" aria-pressed="true">Jeden Monat</button>
+            <button type="button" data-mode="spread" aria-pressed="false">Einmal, verteilt</button>
+          </div>
+          <p class="note" id="payHint">Miete, Handy, Deutschlandticket, Abos: Der Betrag zählt in jedem Monat mit.</p>
+        </div>
         <div class="row2">
-          <div class="field amount"><label class="label" for="xAmount">Betrag €</label><input id="xAmount" inputmode="decimal" placeholder="0,00"></div>
+          <div class="field amount"><label class="label" for="xAmount" id="xAmountLabel">Betrag pro Monat €</label><input id="xAmount" inputmode="decimal" placeholder="0,00"></div>
           <div class="field"><label class="label" for="xCat">Kategorie</label><select id="xCat"></select></div>
         </div>
+        <div id="spreadFields" class="add" hidden>
+          <div class="field"><span class="label">Verteilen auf</span>
+            <div class="seg" role="group" aria-label="Verteilen auf" id="spreadSeg">
+              <button type="button" data-n="3" aria-pressed="false">3 Mon.</button>
+              <button type="button" data-n="6" aria-pressed="false">6 Mon.</button>
+              <button type="button" data-n="12" aria-pressed="true">12 Mon.</button>
+              <button type="button" data-n="24" aria-pressed="false">24 Mon.</button>
+            </div>
+          </div>
+          <div class="field"><label class="label" for="xDate">Bezahlt am</label><input id="xDate" type="date"></div>
+        </div>
         <div class="field"><label class="label" for="xName">Name</label><input id="xName" placeholder="z. B. WG-Miete"></div>
-        <button class="primary" type="submit">Fixkosten hinzufügen</button>
+        <button class="primary" type="submit" id="fixSubmit">Fixkosten hinzufügen</button>
       </form>
     </section>
     <section class="list" id="fixList"></section>
@@ -376,9 +385,12 @@ function expensesIn(mk){
   });
   return out;
 }
+// Verteilte Zahlungen (Jahres-/Einmalzahlungen) gehören zu den Fixkosten
+const variableIn=mk=>expensesIn(mk).filter(e=>!e.n);
+const spreadIn=mk=>expensesIn(mk).filter(e=>e.n);
 function monthTotals(mk){
-  const v=expensesIn(mk).reduce((s,e)=>s+e.amount,0);
-  const f=fixedFor(mk).reduce((s,x)=>s+x.amount,0);
+  const v=variableIn(mk).reduce((s,e)=>s+e.amount,0);
+  const f=fixedFor(mk).reduce((s,x)=>s+x.amount,0)+spreadIn(mk).reduce((s,e)=>s+e.amount,0);
   return {v,f,t:v+f};
 }
 function firstMonth(){
@@ -393,9 +405,9 @@ function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show")
 /* ---------- Anzeige ---------- */
 function render(){
   const mk=monthKey();
-  const items=expensesIn(mk);
+  const items=variableIn(mk);
   const varSum=items.reduce((s,e)=>s+e.amount,0);
-  const fixNow=fixedFor(mk);
+  const fixNow=fixedFor(mk).concat(spreadIn(mk));
   const fixSum=fixNow.reduce((s,f)=>s+f.amount,0);
   const fixAllSum=data.fixed.reduce((s,f)=>s+f.amount,0);
   const total=varSum+fixSum;
@@ -466,11 +478,28 @@ function render(){
 
   // Fixkosten-Liste
   const fl=$("fixList");fl.textContent="";
-  if(!data.fixed.length)fl.innerHTML='<div class="empty">Noch keine Fixkosten eingetragen.<br>Fang mit deiner Miete an. Sie zählt dann jeden Monat automatisch mit.</div>';
-  else{
+  const spreads=data.expenses.filter(e=>e.spread>1);
+  if(!data.fixed.length&&!spreads.length)fl.innerHTML='<div class="empty">Noch keine Fixkosten eingetragen.<br>Fang mit deiner Miete an. Sie zählt dann jeden Monat automatisch mit.</div>';
+  if(data.fixed.length){
     const sec=document.createElement("div");sec.className="day";
     sec.innerHTML='<h3><span>Jeden Monat</span><span class="num">'+fmt(fixAllSum)+'</span></h3>';
     data.fixed.slice().sort((a,b)=>b.amount-a.amount).forEach(f=>sec.appendChild(row(f.name,f.cat,f.amount,f.id,()=>{data.fixed=data.fixed.filter(x=>x.id!==f.id)})));
+    fl.appendChild(sec);
+  }
+  if(spreads.length){
+    const now=thisMonth();
+    const sec=document.createElement("div");sec.className="day";
+    const thisSum=spreadIn(now).reduce((a,e)=>a+e.amount,0);
+    sec.innerHTML='<h3><span>Verteilt · pro Monat</span><span class="num">'+fmt(thisSum)+'</span></h3>';
+    spreads.map(e=>{const start=e.date.slice(0,7),end=shiftMk(start,e.spread-1);return{e,start,end,done:end<now}})
+      .sort((a,b)=>(a.done-b.done)||b.e.date.localeCompare(a.e.date))
+      .forEach(({e,start,end,done})=>{
+        const ms=mk=>{const[y,m]=mk.split("-");return MONTHS[m-1].slice(0,3)+" "+y.slice(2)};
+        const sub=fmt(e.amount)+" · "+ms(start)+"–"+ms(end)+(done?" · abgelaufen":"");
+        const r=row(e.note||e.cat,sub,shareOf(e.amount,e.spread,0),e.id,()=>{data.expenses=data.expenses.filter(x=>x.id!==e.id)},"Ganz löschen?",e.spread+" Mon.");
+        if(done)r.style.opacity=.55;
+        sec.appendChild(r);
+      });
     fl.appendChild(sec);
   }
 
@@ -558,8 +587,8 @@ function renderBars(){
 const catColor=c=>{const i=CATS.indexOf(c);return i>=0&&i<8?"var(--c"+(i+1)+")":"var(--c0)"};
 function catBreakdown(mk){
   const by={};
-  expensesIn(mk).forEach(e=>{by[e.cat]=(by[e.cat]||0)+e.amount});
-  if(ui.pieMode==="all")fixedFor(mk).forEach(f=>{by[f.cat]=(by[f.cat]||0)+f.amount});
+  variableIn(mk).forEach(e=>{by[e.cat]=(by[e.cat]||0)+e.amount});
+  if(ui.pieMode==="all")fixedFor(mk).concat(spreadIn(mk)).forEach(f=>{by[f.cat]=(by[f.cat]||0)+f.amount});
   return Object.entries(by).filter(([,v])=>v>0).map(([c,v])=>({c,v})).sort((a,b)=>b.v-a.v);
 }
 function renderSlides(){
@@ -642,29 +671,35 @@ function row(title,sub,amount,id,remove,confirmText,tag){
 
 /* ---------- Eingaben ---------- */
 $("fDate").value=todayISO();
-ui.spread=1;
-function updateSpread(){
+$("xDate").value=todayISO();
+ui.payMode="monthly";ui.spread=12;
+function updatePay(){
+  const spread=ui.payMode==="spread";
+  [...$("payMode").children].forEach(b=>b.setAttribute("aria-pressed",b.dataset.mode===ui.payMode));
   [...$("spreadSeg").children].forEach(b=>b.setAttribute("aria-pressed",Number(b.dataset.n)===ui.spread));
-  const h=$("spreadHint"),amt=parseAmt($("fAmount").value);
-  if(ui.spread===1){h.textContent="Für Jahreskäufe wie BahnCard oder Büchereiausweis: Der Betrag wird gleichmäßig auf die Monate verteilt.";return}
-  const start=($("fDate").value||todayISO()).slice(0,7),end=shiftMk(start,ui.spread-1);
-  h.textContent=(amt>0?fmt(amt)+" → "+fmt(shareOf(amt,ui.spread,0))+" pro Monat, ":"Wird verteilt auf ")+mkLabel(start)+" bis "+mkLabel(end)+".";
+  $("spreadFields").hidden=!spread;
+  $("xAmountLabel").textContent=spread?"Gesamtbetrag €":"Betrag pro Monat €";
+  $("xName").placeholder=spread?"z. B. BahnCard 50":"z. B. WG-Miete";
+  $("fixSubmit").textContent=spread?"Auf "+ui.spread+" Monate verteilen":"Fixkosten hinzufügen";
+  const h=$("payHint");
+  if(!spread){h.textContent="Miete, Handy, Deutschlandticket, Abos: Der Betrag zählt in jedem Monat mit.";return}
+  const amt=parseAmt($("xAmount").value),start=($("xDate").value||todayISO()).slice(0,7),end=shiftMk(start,ui.spread-1);
+  h.textContent="Für Jahreszahlungen wie BahnCard oder Büchereiausweis. "+(amt>0?fmt(amt)+" → "+fmt(shareOf(amt,ui.spread,0))+" pro Monat, ":"Wird gleichmäßig verteilt, ")+mkLabel(start)+" bis "+mkLabel(end)+".";
 }
-[...$("spreadSeg").children].forEach(b=>b.onclick=()=>{ui.spread=Number(b.dataset.n);updateSpread()});
-$("fAmount").addEventListener("input",updateSpread);$("fDate").addEventListener("change",updateSpread);
+[...$("payMode").children].forEach(b=>b.onclick=()=>{ui.payMode=b.dataset.mode;updatePay()});
+[...$("spreadSeg").children].forEach(b=>b.onclick=()=>{ui.spread=Number(b.dataset.n);updatePay()});
+$("xAmount").addEventListener("input",updatePay);$("xDate").addEventListener("change",updatePay);
 const xCat=$("xCat");CATS.forEach(c=>{const o=document.createElement("option");o.textContent=c;xCat.appendChild(o)});xCat.value="Wohnen & Nebenkosten";
+updatePay();
 
 $("addForm").onsubmit=ev=>{
   ev.preventDefault();
   const amount=parseAmt($("fAmount").value);
   if(!(amount>0)){toast("Bitte einen Betrag eingeben, z. B. 12,50");$("fAmount").focus();return}
   const date=$("fDate").value||todayISO();
-  const exp={id:uid(),date,amount,cat:ui.cat,note:$("fNote").value.trim(),created:Date.now()};
-  if(ui.spread>1)exp.spread=ui.spread;
-  data.expenses.push(exp);
+  data.expenses.push({id:uid(),date,amount,cat:ui.cat,note:$("fNote").value.trim(),created:Date.now()});
   if(!save())return;
-  toast(ui.spread>1?fmt(amount)+" auf "+ui.spread+" Monate verteilt":fmt(amount)+" eingetragen");
-  ui.spread=1;updateSpread();
+  toast(fmt(amount)+" eingetragen");
   $("fAmount").value="";$("fNote").value="";document.activeElement&&document.activeElement.blur();
   const [y,m]=date.split("-").map(Number);ui.cur={y,m:m-1};render();
 };
@@ -673,9 +708,16 @@ $("fixForm").onsubmit=ev=>{
   ev.preventDefault();
   const amount=parseAmt($("xAmount").value),name=$("xName").value.trim();
   if(!(amount>0)||!name){toast("Bitte Name und Betrag eingeben");return}
-  data.fixed.push({id:uid(),name,amount,cat:xCat.value,created:Date.now()});
-  if(!save())return;
-  toast(name+" hinzugefügt");$("xAmount").value="";$("xName").value="";document.activeElement&&document.activeElement.blur();render();
+  if(ui.payMode==="spread"){
+    data.expenses.push({id:uid(),date:$("xDate").value||todayISO(),amount,cat:xCat.value,note:name,spread:ui.spread,created:Date.now()});
+    if(!save())return;
+    toast(name+": "+fmt(shareOf(amount,ui.spread,0))+" pro Monat");
+    ui.payMode="monthly";$("xDate").value=todayISO();updatePay();
+  }else{
+    data.fixed.push({id:uid(),name,amount,cat:xCat.value,created:Date.now()});
+    if(!save())return;
+    toast(name+" hinzugefügt");
+  }$("xAmount").value="";$("xName").value="";document.activeElement&&document.activeElement.blur();render();
 };
 $("prev").onclick=()=>{let{y,m}=ui.cur;if(--m<0){m=11;y--}ui.cur={y,m};ui.confirm=null;render()};
 $("next").onclick=()=>{let{y,m}=ui.cur;if(++m>11){m=0;y++}ui.cur={y,m};ui.confirm=null;render()};

@@ -1,6 +1,6 @@
 // Offline-Betrieb: App-Dateien werden auf dem Gerät zwischengespeichert.
 // Bei einem Update hier die Versionsnummer erhöhen.
-const CACHE = "haushaltsbuch-v4";
+const CACHE = "haushaltsbuch-v5";
 const FILES = ["./", "index.html", "manifest.webmanifest", "icons/apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", e => {
